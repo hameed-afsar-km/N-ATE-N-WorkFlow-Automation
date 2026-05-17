@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'FlowMind — Visual Workflow Automation',
+  title: 'N-ATE-N WorkFlow Automation',
   description: 'Build powerful AI automation workflows with drag-and-drop. Powered by LangGraph, LangChain, and Ollama for local LLM orchestration.',
   keywords: ['workflow automation', 'AI', 'LangGraph', 'Ollama', 'no-code', 'LLM'],
 };

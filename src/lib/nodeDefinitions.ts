@@ -156,7 +156,30 @@ export const NODE_DEFINITIONS: NodeTypeDef[] = [
     description: 'Send email via SMTP',
     category: 'integration',
     color: '#d97706',
-    defaultData: { to: '', subject: 'Automated Email', body: '{{output}}' },
+    defaultData: { 
+      to: '', 
+      subject: 'Automated Email', 
+      body: '{{output}}',
+      smtp_host: 'smtp.gmail.com',
+      smtp_port: '587',
+      smtp_user: '',
+      smtp_password: ''
+    },
+  },
+  {
+    type: 'gmail_send',
+    label: 'Gmail',
+    icon: 'Mail',
+    description: 'Send email via Google Mail',
+    category: 'integration',
+    color: '#ea4335',
+    defaultData: { 
+      to: '', 
+      subject: 'Automated Email', 
+      body: '{{output}}',
+      user_email: '',
+      app_password: ''
+    },
   },
   {
     type: 'slack_message',
