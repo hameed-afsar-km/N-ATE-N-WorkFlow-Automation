@@ -31,6 +31,10 @@ interface WorkflowStore {
   edges: FlowEdge[];
   selectedNode: FlowNode | null;
 
+  // History Stacks
+  historyStack: { nodes: FlowNode[]; edges: FlowEdge[] }[];
+  futureStack: { nodes: FlowNode[]; edges: FlowEdge[] }[];
+
   // Workflows
   workflows: Workflow[];
   activeWorkflow: Workflow | null;
@@ -62,6 +66,11 @@ interface WorkflowStore {
   deleteNode: (nodeId: string) => void;
   selectNode: (node: FlowNode | null) => void;
   duplicateNode: (nodeId: string) => void;
+  
+  // History actions
+  pushToHistory: () => void;
+  undo: () => void;
+  redo: () => void;
 
   // Workflow actions
   loadWorkflows: () => Promise<void>;
@@ -157,18 +166,29 @@ export const useWorkflowStore = create<WorkflowStore>()(
     ollamaModels: ['llama3.2', 'mistral', 'phi3'],
     ollamaStatus: 'checking',
     isLoading: false,
+    historyStack: [],
+    futureStack: [],
 
     // ── Canvas ─────────────────────────────────────
 
     onNodesChange: (changes) => {
+      const hasRemove = changes.some((c) => c.type === 'remove');
+      if (hasRemove) {
+        get().pushToHistory();
+      }
       set((s) => ({ nodes: applyNodeChanges(changes, s.nodes) as FlowNode[] }));
     },
 
     onEdgesChange: (changes) => {
+      const hasRemove = changes.some((c) => c.type === 'remove');
+      if (hasRemove) {
+        get().pushToHistory();
+      }
       set((s) => ({ edges: applyEdgeChanges(changes, s.edges) as FlowEdge[] }));
     },
 
     onConnect: (connection) => {
+      get().pushToHistory();
       set((s) => ({
         edges: addEdge(
           { ...connection, type: 'smoothstep', animated: false },
@@ -178,6 +198,7 @@ export const useWorkflowStore = create<WorkflowStore>()(
     },
 
     addNode: (typeDef, position = { x: 300, y: 300 }) => {
+      get().pushToHistory();
       const id = `node-${uuid()}`;
       const newNode: FlowNode = {
         id,
@@ -197,6 +218,7 @@ export const useWorkflowStore = create<WorkflowStore>()(
     },
 
     updateNodeConfig: (nodeId, config) => {
+      get().pushToHistory();
       set((s) => ({
         nodes: s.nodes.map((n) =>
           n.id === nodeId
@@ -211,6 +233,7 @@ export const useWorkflowStore = create<WorkflowStore>()(
     },
 
     deleteNode: (nodeId) => {
+      get().pushToHistory();
       set((s) => ({
         nodes: s.nodes.filter((n) => n.id !== nodeId),
         edges: s.edges.filter((e) => e.source !== nodeId && e.target !== nodeId),
@@ -223,6 +246,7 @@ export const useWorkflowStore = create<WorkflowStore>()(
     },
 
     duplicateNode: (nodeId) => {
+      get().pushToHistory();
       const node = get().nodes.find((n) => n.id === nodeId);
       if (!node) return;
       const id = `node-${uuid()}`;
@@ -233,6 +257,58 @@ export const useWorkflowStore = create<WorkflowStore>()(
         data: { ...node.data, status: 'idle', result: undefined },
       };
       set((s) => ({ nodes: [...s.nodes, newNode] }));
+    },
+
+    // ── History actions ───────────────────────────
+
+    pushToHistory: () => {
+      const { nodes, edges } = get();
+      const currentSnapshot = {
+        nodes: JSON.parse(JSON.stringify(nodes)),
+        edges: JSON.parse(JSON.stringify(edges))
+      };
+      set((s) => ({
+        historyStack: [...s.historyStack, currentSnapshot].slice(-50),
+        futureStack: []
+      }));
+    },
+
+    undo: () => {
+      const { historyStack, futureStack, nodes, edges } = get();
+      if (historyStack.length === 0) return;
+      
+      const newHistory = [...historyStack];
+      const previous = newHistory.pop()!;
+      const currentSnapshot = {
+        nodes: JSON.parse(JSON.stringify(nodes)),
+        edges: JSON.parse(JSON.stringify(edges))
+      };
+      
+      set({
+        nodes: previous.nodes,
+        edges: previous.edges,
+        historyStack: newHistory,
+        futureStack: [currentSnapshot, ...futureStack].slice(0, 50)
+      });
+    },
+
+    redo: () => {
+      const { historyStack, futureStack, nodes, edges } = get();
+      if (futureStack.length === 0) return;
+      
+      const newFuture = [...futureStack];
+      const next = newFuture.shift()!;
+      const currentSnapshot = {
+        nodes: JSON.parse(JSON.stringify(nodes)),
+        edges: JSON.parse(JSON.stringify(edges))
+      };
+      
+      set({
+        nodes: next.nodes,
+        edges: next.edges,
+        futureStack: newFuture,
+        historyStack: [...historyStack, currentSnapshot].slice(-50)
+      });
     },
 
     // ── Workflows ─────────────────────────────────

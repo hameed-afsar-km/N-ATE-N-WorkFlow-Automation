@@ -51,6 +51,39 @@ function CanvasInner() {
     selectNode(null);
   }, [selectNode]);
 
+  const onNodeDragStop = useCallback(() => {
+    useWorkflowStore.getState().pushToHistory();
+  }, []);
+
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      if (activeEl && (
+        activeEl.tagName === 'INPUT' || 
+        activeEl.tagName === 'TEXTAREA' || 
+        activeEl.tagName === 'SELECT' || 
+        activeEl.getAttribute('contenteditable') === 'true'
+      )) {
+        return;
+      }
+
+      const isUndo = (e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z';
+      const isRedoShift = (e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z';
+      const isRedoY = (e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'y';
+
+      if (isUndo) {
+        e.preventDefault();
+        useWorkflowStore.getState().undo();
+      } else if (isRedoShift || isRedoY) {
+        e.preventDefault();
+        useWorkflowStore.getState().redo();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const isValidConnection = useCallback(
     (connection: import('@xyflow/react').Connection) => {
       // Prevent self-connections
@@ -74,6 +107,8 @@ function CanvasInner() {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onNodeDragStop={onNodeDragStop}
+        deleteKeyCode={['Backspace', 'Delete']}
         isValidConnection={isValidConnection}
         onNodeClick={onNodeClick}
         onPaneClick={onPaneClick}

@@ -4,13 +4,15 @@ import React, { useState } from 'react';
 import { useWorkflowStore } from '@/store/workflowStore';
 import {
   Play, Square, Save, Trash2, RotateCcw, Zap, ChevronDown,
-  CheckCircle2, XCircle, Loader2, Wifi, WifiOff, Pencil, Check
+  CheckCircle2, XCircle, Loader2, Wifi, WifiOff, Pencil, Check,
+  Undo2, Redo2
 } from 'lucide-react';
 
 export default function Toolbar() {
   const {
     workflowName, setWorkflowName, saveWorkflow, executeWorkflow, clearExecution,
     executionStatus, isLoading, ollamaStatus, nodes, activeWorkflow, newWorkflow,
+    undo, redo, historyStack, futureStack,
   } = useWorkflowStore();
 
   const [editingName, setEditingName] = useState(false);
@@ -90,6 +92,29 @@ export default function Toolbar() {
       <div className="flex-1" />
 
       <div className="flex items-center gap-3">
+        {/* Undo / Redo controls */}
+        <div className="flex items-center gap-1 px-1 py-1 rounded-2xl bg-[rgba(255,255,255,0.03)] border border-[rgba(37,40,72,0.6)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]">
+          <button 
+            onClick={undo}
+            disabled={historyStack.length === 0}
+            className="p-2 rounded-xl transition-all duration-200 enabled:hover:bg-white/5 enabled:hover:text-white disabled:opacity-20 disabled:cursor-not-allowed"
+            title="Undo (Ctrl+Z)"
+            style={{ color: '#8b8fb3' }}
+          >
+            <Undo2 size={15} />
+          </button>
+          <div className="w-px h-4 bg-[rgba(37,40,72,0.5)]" />
+          <button 
+            onClick={redo}
+            disabled={futureStack.length === 0}
+            className="p-2 rounded-xl transition-all duration-200 enabled:hover:bg-white/5 enabled:hover:text-white disabled:opacity-20 disabled:cursor-not-allowed"
+            title="Redo (Ctrl+Y)"
+            style={{ color: '#8b8fb3' }}
+          >
+            <Redo2 size={15} />
+          </button>
+        </div>
+
         {/* New */}
         <button onClick={newWorkflow}
           className="flex items-center gap-2.5 rounded-[20px] text-xs font-bold transition-all duration-300"

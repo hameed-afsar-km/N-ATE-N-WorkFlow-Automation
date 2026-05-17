@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useWorkflowStore } from '@/store/workflowStore';
 import { NODE_DEF_MAP } from '@/lib/nodeDefinitions';
 import * as Icons from 'lucide-react';
@@ -201,23 +201,304 @@ function HttpConfig({ config, update, onFocusField }: { config: Record<string, u
 }
 
 function ScheduleConfig({ config, update, onFocusField }: { config: Record<string, unknown>; update: (k: string, v: unknown) => void; onFocusField: (k: string) => void }) {
+  const { selectedNode, updateNodeConfig } = useWorkflowStore();
+  
+  const scheduleStyle = String(config.scheduleStyle ?? 'delay');
+  const frequency = String(config.frequency ?? 'repeat');
+  const repeatMode = String(config.repeatMode ?? 'interval');
+  const cronVal = String(config.cron ?? '*/5 * * * *');
+  
+  const intervalHours = Number(config.intervalHours ?? 0);
+  const intervalMinutes = Number(config.intervalMinutes ?? 5);
+  const intervalSeconds = Number(config.intervalSeconds ?? 0);
+  
+  const dailyHour = Number(config.dailyHour ?? 12);
+  const dailyMinute = Number(config.dailyMinute ?? 0);
+  const dailySecond = Number(config.dailySecond ?? 0);
+
+  const updateScheduleFull = (style: string, freq: string, mode: string, updates: Record<string, any>) => {
+    if (!selectedNode) return;
+
+    const merged = {
+      scheduleStyle: style,
+      frequency: freq,
+      repeatMode: mode,
+      intervalHours,
+      intervalMinutes,
+      intervalSeconds,
+      dailyHour,
+      dailyMinute,
+      dailySecond,
+      ...updates
+    };
+
+    let computedCron = cronVal;
+    if (style === 'time') {
+      computedCron = `${merged.dailyMinute} ${merged.dailyHour} * * *`;
+    } else {
+      if (mode === 'interval') {
+        const h = merged.intervalHours;
+        const m = merged.intervalMinutes;
+        if (h > 0) {
+          computedCron = `0 */${h} * * *`;
+        } else if (m > 0) {
+          computedCron = `*/${m} * * * *`;
+        } else {
+          computedCron = `* * * * *`;
+        }
+      } else {
+        computedCron = updates.cron !== undefined ? updates.cron : cronVal;
+      }
+    }
+
+    updateNodeConfig(selectedNode.id, {
+      scheduleStyle: style,
+      frequency: freq,
+      repeatMode: mode,
+      cron: computedCron,
+      ...updates
+    });
+  };
+
   return (
-    <Field label="Cron Schedule Expression (cron)">
-      <Input value={String(config.cron ?? '*/5 * * * *')} onChange={v => update('cron', v)} onFocus={() => onFocusField('cron')} placeholder="*/5 * * * *" />
-    </Field>
+    <div className="flex flex-col gap-4">
+      {/* Tier 1 Toggle: Delay vs Time Schedule */}
+      <div className="flex flex-col gap-1.5">
+        <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest ml-1">Trigger Style</span>
+        <div className="flex p-1 rounded-xl bg-[rgba(15,16,28,0.5)] border border-[rgba(37,40,72,0.6)]">
+          {[
+            { id: 'delay', label: 'Delay' },
+            { id: 'time', label: 'Time Schedule' }
+          ].map(style => (
+            <button
+              key={style.id}
+              onClick={() => updateScheduleFull(style.id, frequency, repeatMode, {})}
+              className="flex-1 text-center py-2.5 rounded-lg text-[9px] font-extrabold uppercase tracking-wider transition-all duration-300"
+              style={{
+                background: scheduleStyle === style.id ? 'rgba(108,99,255,0.15)' : 'transparent',
+                color: scheduleStyle === style.id ? '#6c63ff' : '#4a4e78',
+                border: scheduleStyle === style.id ? '1px solid rgba(108,99,255,0.25)' : '1px solid transparent'
+              }}
+            >
+              {style.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Tier 2 Toggle: Repeat vs Once */}
+      <div className="flex flex-col gap-1.5">
+        <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest ml-1">Execution Frequency</span>
+        <div className="flex p-1 rounded-xl bg-[rgba(15,16,28,0.5)] border border-[rgba(37,40,72,0.6)]">
+          {[
+            { id: 'repeat', label: 'Repeat' },
+            { id: 'once', label: 'Once' }
+          ].map(freq => (
+            <button
+              key={freq.id}
+              onClick={() => updateScheduleFull(scheduleStyle, freq.id, repeatMode, {})}
+              className="flex-1 text-center py-2.5 rounded-lg text-[9px] font-extrabold uppercase tracking-wider transition-all duration-300"
+              style={{
+                background: frequency === freq.id ? 'rgba(0,229,160,0.1)' : 'transparent',
+                color: frequency === freq.id ? '#00e5a0' : '#4a4e78',
+                border: frequency === freq.id ? '1px solid rgba(0,229,160,0.2)' : '1px solid transparent'
+              }}
+            >
+              {freq.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Sub-config for Delay */}
+      {scheduleStyle === 'delay' && (
+        <div className="flex flex-col gap-4 animate-fade-up">
+          {/* Repeat Mode sub-toggles */}
+          <div className="flex justify-end gap-2 pr-1">
+            {[
+              { id: 'interval', label: 'Interval (HH:MM:SS)' },
+              { id: 'cron', label: 'Custom Cron' }
+            ].map(m => (
+              <button
+                key={m.id}
+                onClick={() => updateScheduleFull('delay', frequency, m.id, {})}
+                className="px-2.5 py-1 rounded-md text-[9px] font-extrabold uppercase tracking-wider transition-all"
+                style={{
+                  background: repeatMode === m.id ? 'rgba(108,99,255,0.1)' : 'transparent',
+                  color: repeatMode === m.id ? '#6c63ff' : '#4a4e78',
+                  border: `1px solid ${repeatMode === m.id ? 'rgba(108,99,255,0.2)' : 'transparent'}`
+                }}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+
+          {repeatMode === 'interval' ? (
+            <Field label="Delay Duration (Interval)">
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center gap-3">
+                  {/* Hours */}
+                  <div className="flex-1 flex flex-col gap-1.5">
+                    <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest text-center">Hours</span>
+                    <select
+                      value={intervalHours}
+                      onChange={e => updateScheduleFull('delay', frequency, 'interval', { intervalHours: Number(e.target.value) })}
+                      className="px-3 py-2 rounded-xl text-xs outline-none bg-[rgba(15,16,28,0.75)] border border-[rgba(37,40,72,0.8)] text-[#f0f1ff] text-center font-mono cursor-pointer focus:border-[rgba(108,99,255,0.6)]"
+                    >
+                      {Array.from({ length: 24 }).map((_, i) => (
+                        <option key={i} value={i}>{String(i).padStart(2, '0')}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Minutes */}
+                  <div className="flex-1 flex flex-col gap-1.5">
+                    <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest text-center">Minutes</span>
+                    <select
+                      value={intervalMinutes}
+                      onChange={e => updateScheduleFull('delay', frequency, 'interval', { intervalMinutes: Number(e.target.value) })}
+                      className="px-3 py-2 rounded-xl text-xs outline-none bg-[rgba(15,16,28,0.75)] border border-[rgba(37,40,72,0.8)] text-[#f0f1ff] text-center font-mono cursor-pointer focus:border-[rgba(108,99,255,0.6)]"
+                    >
+                      {Array.from({ length: 60 }).map((_, i) => (
+                        <option key={i} value={i}>{String(i).padStart(2, '0')}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Seconds */}
+                  <div className="flex-1 flex flex-col gap-1.5">
+                    <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest text-center">Seconds</span>
+                    <select
+                      value={intervalSeconds}
+                      onChange={e => updateScheduleFull('delay', frequency, 'interval', { intervalSeconds: Number(e.target.value) })}
+                      className="px-3 py-2 rounded-xl text-xs outline-none bg-[rgba(15,16,28,0.75)] border border-[rgba(37,40,72,0.8)] text-[#f0f1ff] text-center font-mono cursor-pointer focus:border-[rgba(108,99,255,0.6)]"
+                    >
+                      {Array.from({ length: 60 }).map((_, i) => (
+                        <option key={i} value={i}>{String(i).padStart(2, '0')}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-2 p-3 rounded-xl border bg-[rgba(108,99,255,0.04)] border-[rgba(108,99,255,0.15)] text-[10px] text-[#8b8fb3] leading-relaxed">
+                  <Icons.Clock size={12} className="mt-0.5 text-[#6c63ff] flex-shrink-0" />
+                  <span>
+                    Schedules dynamic waiting delay. Calculated cron: <strong className="font-mono text-white">{cronVal}</strong>
+                  </span>
+                </div>
+              </div>
+            </Field>
+          ) : (
+            <Field label="Cron Schedule Expression (cron)">
+              <div className="flex flex-col gap-2">
+                <Input
+                  value={cronVal}
+                  onChange={v => updateScheduleFull('delay', frequency, 'cron', { cron: v })}
+                  onFocus={() => onFocusField('cron')}
+                  placeholder="*/5 * * * *"
+                />
+              </div>
+            </Field>
+          )}
+        </div>
+      )}
+
+      {/* Sub-config for Time Schedule */}
+      {scheduleStyle === 'time' && (
+        <div className="flex flex-col gap-4 animate-fade-up">
+          <Field label="Trigger at Specific Daily Time">
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-3">
+                {/* Daily Hour */}
+                <div className="flex-1 flex flex-col gap-1.5">
+                  <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest text-center">Hour</span>
+                  <select
+                    value={dailyHour}
+                    onChange={e => updateScheduleFull('time', frequency, repeatMode, { dailyHour: Number(e.target.value) })}
+                    className="px-3 py-2 rounded-xl text-xs outline-none bg-[rgba(15,16,28,0.75)] border border-[rgba(37,40,72,0.8)] text-[#f0f1ff] text-center font-mono cursor-pointer focus:border-[rgba(108,99,255,0.6)]"
+                  >
+                    {Array.from({ length: 24 }).map((_, i) => (
+                      <option key={i} value={i}>{String(i).padStart(2, '0')}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Daily Minute */}
+                <div className="flex-1 flex flex-col gap-1.5">
+                  <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest text-center">Minute</span>
+                  <select
+                    value={dailyMinute}
+                    onChange={e => updateScheduleFull('time', frequency, repeatMode, { dailyMinute: Number(e.target.value) })}
+                    className="px-3 py-2 rounded-xl text-xs outline-none bg-[rgba(15,16,28,0.75)] border border-[rgba(37,40,72,0.8)] text-[#f0f1ff] text-center font-mono cursor-pointer focus:border-[rgba(108,99,255,0.6)]"
+                  >
+                    {Array.from({ length: 60 }).map((_, i) => (
+                      <option key={i} value={i}>{String(i).padStart(2, '0')}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Daily Second */}
+                <div className="flex-1 flex flex-col gap-1.5">
+                  <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest text-center">Second</span>
+                  <select
+                    value={dailySecond}
+                    onChange={e => updateScheduleFull('time', frequency, repeatMode, { dailySecond: Number(e.target.value) })}
+                    className="px-3 py-2 rounded-xl text-xs outline-none bg-[rgba(15,16,28,0.75)] border border-[rgba(37,40,72,0.8)] text-[#f0f1ff] text-center font-mono cursor-pointer focus:border-[rgba(108,99,255,0.6)]"
+                  >
+                    {Array.from({ length: 60 }).map((_, i) => (
+                      <option key={i} value={i}>{String(i).padStart(2, '0')}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2 p-3 rounded-xl border bg-[rgba(108,99,255,0.04)] border-[rgba(108,99,255,0.15)] text-[10px] text-[#8b8fb3] leading-relaxed">
+                <Icons.Clock size={12} className="mt-0.5 text-[#6c63ff] flex-shrink-0" />
+                <span>
+                  Executes at exactly <strong className="text-white font-mono">{String(dailyHour).padStart(2, '0')}:{String(dailyMinute).padStart(2, '0')}:{String(dailySecond).padStart(2, '0')}</strong>.
+                </span>
+              </div>
+            </div>
+          </Field>
+        </div>
+      )}
+    </div>
   );
 }
 
 function ManualTriggerConfig({ config, update, onFocusField }: { config: Record<string, unknown>; update: (k: string, v: unknown) => void; onFocusField: (k: string) => void }) {
+  const [jsonError, setJsonError] = useState<string | null>(null);
+  const payloadStr = String(config.payload ?? '{\n  "message": ""\n}');
+
+  useEffect(() => {
+    try {
+      if (payloadStr.trim()) {
+        JSON.parse(payloadStr);
+      }
+      setJsonError(null);
+    } catch (e: any) {
+      setJsonError(e.message);
+    }
+  }, [payloadStr]);
+
   return (
     <Field label="Manual User Mock Input (JSON Payload)">
-      <Textarea
-        value={String(config.payload ?? '{\n  "message": ""\n}')}
-        onChange={v => update('payload', v)}
-        onFocus={() => onFocusField('payload')}
-        placeholder='{\n  "message": "test"\n}'
-        rows={10}
-      />
+      <div className="flex flex-col gap-2.5">
+        <Textarea
+          value={payloadStr}
+          onChange={v => update('payload', v)}
+          onFocus={() => onFocusField('payload')}
+          placeholder='{\n  "message": "test"\n}'
+          rows={10}
+        />
+        {jsonError && (
+          <div className="flex items-start gap-2 p-3 rounded-xl border bg-[rgba(239,68,68,0.06)] border-[rgba(239,68,68,0.25)] text-xs text-[#ef4444] font-medium leading-relaxed animate-fade-up">
+            <div className="mt-0.5 w-1.5 h-1.5 rounded-full bg-[#ef4444] flex-shrink-0 animate-pulse" />
+            <span><strong>JSON Syntax Error:</strong> {jsonError}</span>
+          </div>
+        )}
+      </div>
     </Field>
   );
 }
