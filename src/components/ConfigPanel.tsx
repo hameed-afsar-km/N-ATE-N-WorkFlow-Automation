@@ -517,10 +517,66 @@ function FilterConfig({ config, update, onFocusField }: { config: Record<string,
 }
 
 function WaitConfig({ config, update, onFocusField }: { config: Record<string, unknown>; update: (k: string, v: unknown) => void; onFocusField: (k: string) => void }) {
+  const seconds = Number(config.seconds ?? 1);
+  const enableLoop = !!config.enableLoop;
+  const loopCount = Number(config.loopCount ?? 2);
+
   return (
-    <Field label="Execution Delay (seconds)">
-      <Input type="number" value={String(config.seconds ?? 1)} onChange={v => update('seconds', parseFloat(v))} onFocus={() => onFocusField('seconds')} placeholder="1" />
-    </Field>
+    <div className="flex flex-col gap-4 animate-fade-up">
+      <Field label="Execution Delay (seconds)">
+        <Input 
+          type="number" 
+          value={String(seconds)} 
+          onChange={v => update('seconds', parseFloat(v) || 0)} 
+          onFocus={() => onFocusField('seconds')} 
+          placeholder="1" 
+        />
+      </Field>
+
+      <div className="flex flex-col gap-1.5">
+        <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest ml-1">Loop Execution</span>
+        <div className="flex p-1 rounded-xl bg-[rgba(15,16,28,0.5)] border border-[rgba(37,40,72,0.6)]">
+          {[
+            { id: false, label: 'Wait Once' },
+            { id: true, label: 'Loop Wait' }
+          ].map(opt => (
+            <button
+              key={String(opt.id)}
+              onClick={() => update('enableLoop', opt.id)}
+              className="flex-1 text-center py-2 rounded-lg text-[9px] font-extrabold uppercase tracking-wider transition-all duration-300"
+              style={{
+                background: enableLoop === opt.id ? 'rgba(108,99,255,0.15)' : 'transparent',
+                color: enableLoop === opt.id ? '#6c63ff' : '#4a4e78',
+                border: enableLoop === opt.id ? '1px solid rgba(108,99,255,0.25)' : '1px solid transparent'
+              }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {enableLoop && (
+        <div className="flex flex-col gap-4 animate-fade-up">
+          <Field label="Number of Loop Iterations">
+            <Input 
+              type="number" 
+              value={String(loopCount)} 
+              onChange={v => update('loopCount', parseInt(v, 10) || 1)} 
+              onFocus={() => onFocusField('loopCount')} 
+              placeholder="2" 
+            />
+          </Field>
+
+          <div className="flex items-start gap-2 p-3 rounded-xl border bg-[rgba(108,99,255,0.04)] border-[rgba(108,99,255,0.15)] text-[10px] text-[#8b8fb3] leading-relaxed">
+            <Icons.Clock size={12} className="mt-0.5 text-[#6c63ff] flex-shrink-0" />
+            <span>
+              The execution will wait for <strong className="text-white">{seconds} seconds</strong> inside a loop repeating <strong className="text-white">{loopCount} times</strong>. Total delay: <strong className="text-[#00e5a0]">{seconds * loopCount} seconds</strong>.
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
